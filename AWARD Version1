@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>恐龙乐园 - 写实演化竞赛系统</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Helvetica, Arial, sans-serif;
+            background: linear-gradient(180deg, #1a2e21 0%, #064e3b 100%);
+            min-height: 100vh;
+            color: #f0fdf4; 
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* 彩虹标题 */
+        .rainbow-title {
+            font-weight: 700;
+            background: linear-gradient(
+                to right, 
+                #ff4d4d, #ffae42, #f4ff4d, #4dff88, #4dffff, #4d88ff, #ae42ff
+            );
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            display: inline-block;
+            filter: drop-shadow(0 4px 6px rgba(0,0,0,0.4));
+            animation: rainbow-shift 8s linear infinite;
+            background-size: 200% auto;
+        }
+
+        @keyframes rainbow-shift {
+            to { background-position: 200% center; }
+        }
+
+        .dino-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 350px;
+            overflow: visible;
+            position: relative;
+        }
+
+        /* 真实图片样式 */
+        .dino-image {
+            width: 280px;
+            height: 280px;
+            object-fit: contain;
+            filter: drop-shadow(0 15px 30px rgba(0,0,0,0.5));
+            transition: all 1s ease;
+        }
+
+        .dino-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transform-origin: center bottom;
+        }
+
+        /* 蛋动画 */
+        .egg-crack { animation: shake 0.6s infinite ease-in-out; }
+        @keyframes shake {
+            0%, 100% { transform: rotate(0deg); }
+            25% { transform: rotate(3deg); }
+            75% { transform: rotate(-3deg); }
+        }
+
+        /* 进化视觉特效 */
+        .evolution-horn {
+            position: absolute;
+            top: 10%;
+            left: 55%;
+            font-size: 45px;
+            z-index: 20;
+            filter: drop-shadow(0 0 15px #ffd700);
+            animation: pulse 2s infinite;
+        }
+
+        .evolution-wings {
+            position: absolute;
+            top: 20%;
+            width: 320px;
+            display: flex;
+            justify-content: space-between;
+            z-index: 5;
+            opacity: 0.6;
+            pointer-events: none;
+        }
+        .wing { font-size: 100px; filter: hue-rotate(180deg) brightness(1.5); }
+
+        .evolution-babies {
+            position: absolute;
+            bottom: -5%;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            z-index: 25;
+        }
+        .baby-img { width: 60px; height: 60px; object-fit: contain; animation: bounce 3s infinite; }
+
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-15px); }
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 0.8; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.1); }
+        }
+
+        /* 卡片设计 */
+        .group-card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(15px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 40px;
+            transition: all 0.4s ease;
+            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);
+        }
+        .group-card:hover {
+            border-color: rgba(255, 255, 255, 0.3);
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        .stage-badge {
+            background: #10b981; 
+            color: #ffffff; 
+            padding: 4px 18px;
+            border-radius: 99px;
+            font-size: 14px;
+            font-weight: 600;
+            box-shadow: 0 4px 10px rgba(16, 185, 129, 0.3);
+        }
+
+        .evolution-bar-bg {
+            height: 12px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 6px;
+            width: 100%;
+            overflow: hidden;
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .score-text {
+            font-weight: 700; 
+            font-family: "Impact", "Arial Black", sans-serif;
+            letter-spacing: 2px;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-15px); }
+        }
+        .floating { animation: float 5s infinite ease-in-out; }
+
+        .audio-control {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 100;
+            background: rgba(0,0,0,0.4);
+            backdrop-filter: blur(10px);
+            padding: 12px;
+            border-radius: 50%;
+            cursor: pointer;
+            border: 1px solid rgba(255,255,255,0.2);
+            transition: all 0.3s;
+        }
+    </style>
+</head>
+<body class="p-6 md:p-10">
+
+    <div id="audioToggle" class="audio-control" title="开关音效">
+        <span id="audioIcon" class="text-2xl">🔊</span>
+    </div>
+
+    <div id="app" class="max-w-7xl mx-auto">
+        <header class="text-center mb-16">
+            <h1 class="text-6xl mb-6">
+                <span class="rainbow-title">恐龙乐园生命演化赛</span>
+            </h1>
+            <div class="inline-block bg-white/10 text-emerald-100 px-10 py-2.5 rounded-full text-sm font-medium tracking-widest border border-white/20 backdrop-blur-md">
+                REALISTIC EVOLUTION • 见证史前奇迹
+            </div>
+        </header>
+
+        <div id="groupGrid" class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-12">
+            <!-- 动态生成 -->
+        </div>
+
+        <div class="mt-24 flex flex-wrap justify-center gap-10">
+            <button onclick="resetAll()" class="text-emerald-200/70 font-medium hover:text-white transition-all">🔄 重置赛季记录</button>
+            <button onclick="exportData()" class="text-emerald-200/70 font-medium hover:text-white transition-all">💾 备份当前数据</button>
+        </div>
+    </div>
+
+    <script>
+        const AudioManager = {
+            isMuted: false,
+            sounds: {
+                click: new Audio('https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3'),
+                levelUp: new Audio('https://assets.mixkit.co/active_storage/sfx/2019/2019-preview.mp3'),
+                scoreAdd: new Audio('https://assets.mixkit.co/active_storage/sfx/2018/2018-preview.mp3'),
+                scoreSub: new Audio('https://assets.mixkit.co/active_storage/sfx/2567/2567-preview.mp3'),
+                bgm: new Audio('https://assets.mixkit.co/active_storage/sfx/131/131-preview.mp3')
+            },
+            init() {
+                this.sounds.bgm.loop = true;
+                this.sounds.bgm.volume = 0.15;
+                document.getElementById('audioToggle').addEventListener('click', () => this.toggleMute());
+            },
+            play(name) {
+                if (this.isMuted) return;
+                const s = this.sounds[name];
+                if (s) { s.currentTime = 0; s.play().catch(() => {}); }
+            },
+            toggleMute() {
+                this.isMuted = !this.isMuted;
+                const icon = document.getElementById('audioIcon');
+                if (this.isMuted) {
+                    icon.innerText = '🔇';
+                    this.sounds.bgm.pause();
+                } else {
+                    icon.innerText = '🔊';
+                    this.sounds.bgm.play();
+                }
+            }
+        };
+
+        const dinoTypes = [
+            { name: '霸王龙组', img: 'https://images.unsplash.com/photo-1517923332225-dd0fa251941c?auto=format&fit=crop&w=400&q=80', color: 'text-red-500' },
+            { name: '雷龙组', img: 'https://images.unsplash.com/photo-1518107612744-83e84399e0c7?auto=format&fit=crop&w=400&q=80', color: 'text-blue-400' },
+            { name: '剑龙组', img: 'https://images.unsplash.com/photo-1620121692029-d088224ddc74?auto=format&fit=crop&w=400&q=80', color: 'text-green-400' },
+            { name: '三角龙组', img: 'https://images.unsplash.com/photo-1582967788606-a171c1080cb0?auto=format&fit=crop&w=400&q=80', color: 'text-orange-400' },
+            { name: '翼龙组', img: 'https://images.unsplash.com/photo-1550747528-cdb8735d38f6?auto=format&fit=crop&w=400&q=80', color: 'text-purple-400' }
+        ];
+
+        let groups = JSON.parse(localStorage.getItem('dino_life_groups_realistic')) || dinoTypes.map((t, index) => ({
+            id: index + 1,
+            name: t.name,
+            score: 0,
+            img: t.img,
+            color: t.color,
+            lastStage: '沉睡的蛋'
+        }));
+
+        function getEvolutionState(score, groupImg) {
+            let state = {
+                display: 'https://images.unsplash.com/photo-1559591937-e62030777e77?auto=format&fit=crop&w=300&q=80', // 蛋的图
+                stage: '初生恐龙蛋',
+                scale: 0.8,
+                isCracking: false,
+                hasHorn: false,
+                hasWings: false,
+                hasBabies: false,
+                colorClass: 'text-gray-300'
+            };
+
+            if (score < 1000) {
+                state.stage = '沉睡的蛋';
+                if (score > 500) {
+                    state.stage = '蛋壳裂开';
+                    state.isCracking = true;
+                    state.colorClass = 'text-amber-300';
+                }
+            } else {
+                state.display = groupImg; // 使用真实的恐龙图
+                state.scale = 1.0;
+                if (score < 2500) {
+                    state.stage = '幼年形态';
+                    state.scale = 1.1;
+                    state.colorClass = 'text-emerald-400';
+                } else if (score < 5000) {
+                    state.stage = '雄伟成体';
+                    state.scale = 1.4;
+                    state.colorClass = 'text-sky-400';
+                } else if (score < 7000) {
+                    state.stage = '觉醒圣兽';
+                    state.scale = 1.5;
+                    state.hasHorn = true;
+                    state.colorClass = 'text-indigo-400';
+                } else if (score < 9000) {
+                    state.stage = '幻化灵翼';
+                    state.scale = 1.6;
+                    state.hasHorn = true;
+                    state.hasWings = true;
+                    state.colorClass = 'text-fuchsia-400';
+                } else {
+                    state.stage = '族群领袖';
+                    state.scale = 1.7;
+                    state.hasHorn = true;
+                    state.hasWings = true;
+                    state.hasBabies = true;
+                    state.colorClass = 'text-orange-400';
+                }
+            }
+            return state;
+        }
+
+        function render() {
+            const grid = document.getElementById('groupGrid');
+            grid.innerHTML = '';
+
+            groups.forEach(group => {
+                const state = getEvolutionState(group.score, group.img);
+                const progress = Math.min(100, (group.score / 9000) * 100);
+
+                if (state.stage !== group.lastStage) {
+                    AudioManager.play('levelUp');
+                    group.lastStage = state.stage;
+                }
+
+                const card = document.createElement('div');
+                card.className = 'group-card p-10 flex flex-col items-center relative';
+                
+                card.innerHTML = `
+                    <div class="dino-container">
+                        <div class="dino-wrapper ${state.isCracking ? 'egg-crack' : 'floating'}" style="transform: scale(${state.scale});">
+                            ${state.hasWings ? `
+                                <div class="evolution-wings">
+                                    <span class="wing">🦋</span>
+                                    <span class="wing" style="transform: scaleX(-1);">🦋</span>
+                                </div>
+                            ` : ''}
+                            ${state.hasHorn ? `<div class="evolution-horn">🦄</div>` : ''}
+                            <img src="${state.display}" alt="${group.name}" class="dino-image rounded-2xl">
+                            ${state.hasBabies ? `
+                                <div class="evolution-babies">
+                                    <img src="${group.img}" class="baby-img" style="transform: scale(0.6)">
+                                    <img src="${group.img}" class="baby-img" style="transform: scale(0.6)">
+                                </div>
+                            ` : ''}
+                        </div>
+                    </div>
+
+                    <div class="text-center w-full relative z-10 mt-6">
+                        <h2 class="text-3xl font-bold text-white mb-3 tracking-wider">${group.name}</h2>
+                        <div class="stage-badge inline-block mb-8">${state.stage}</div>
+                        
+                        <div class="score-text text-7xl mb-10 ${state.colorClass}">
+                            ${group.score}
+                        </div>
+
+                        <div class="w-full px-4 mb-12">
+                            <div class="evolution-bar-bg">
+                                <div class="h-full bg-gradient-to-r from-emerald-500 to-sky-400 transition-all duration-1000 shadow-[0_0_15px_rgba(16,185,129,0.5)]" style="width: ${progress}%"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="w-full bg-white/5 p-6 rounded-[35px] border border-white/10 space-y-5">
+                        <div class="flex items-center gap-4">
+                            <button onclick="updateScore(${group.id}, -50)" class="w-14 h-14 rounded-full bg-white/10 text-white/50 hover:bg-red-500/20 hover:text-red-400 transition-all border border-white/10 text-xl font-bold">-</button>
+                            <input type="number" id="input-${group.id}" value="100" class="flex-1 text-center bg-transparent font-bold text-4xl text-white outline-none">
+                            <button onclick="updateScore(${group.id}, 50)" class="w-14 h-14 rounded-full bg-white/10 text-white/50 hover:bg-emerald-500/20 hover:text-emerald-400 transition-all border border-white/10 text-xl font-bold">+</button>
+                        </div>
+                        <div class="grid grid-cols-2 gap-5">
+                            <button onclick="handleManual(${group.id}, 'add')" class="bg-emerald-600/80 text-white py-4 rounded-2xl font-bold hover:bg-emerald-500 transition-all shadow-lg active:scale-95">授予荣誉</button>
+                            <button onclick="handleManual(${group.id}, 'sub')" class="bg-white/5 text-red-300 py-4 rounded-2xl font-bold border border-white/10 hover:bg-red-900/30 transition-all active:scale-95">扣除能量</button>
+                        </div>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+
+            localStorage.setItem('dino_life_groups_realistic', JSON.stringify(groups));
+        }
+
+        function updateScore(id, delta) {
+            const group = groups.find(g => g.id === id);
+            if (group) {
+                AudioManager.play(delta > 0 ? 'scoreAdd' : 'scoreSub');
+                group.score = Math.max(0, group.score + delta);
+                render();
+            }
+        }
+
+        function handleManual(id, type) {
+            const val = parseInt(document.getElementById(`input-${id}`).value) || 0;
+            updateScore(id, type === 'add' ? val : -val);
+        }
+
+        function resetAll() {
+            AudioManager.play('click');
+            if(confirm("确定要重置所有史前文明记录吗？")) {
+                groups.forEach(g => {
+                    g.score = 0;
+                    g.lastStage = '沉睡的蛋';
+                });
+                render();
+            }
+        }
+
+        function exportData() {
+            AudioManager.play('click');
+            const data = JSON.stringify(groups, null, 2);
+            const blob = new Blob([data], {type: 'application/json'});
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = `恐龙演化档案_${new Date().toLocaleDateString()}.json`;
+            a.click();
+        }
+
+        window.onload = () => {
+            AudioManager.init();
+            render();
+        };
+    </script>
+</body>
+</html>
